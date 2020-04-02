@@ -10,7 +10,7 @@ WORKDIR /app
 
 COPY . .
 RUN go mod download
-RUN go build -v cmd/main.go
+RUN go build -v cmd/sidecache/main.go
 
 FROM alpine:latest AS alpine
 
