@@ -10,42 +10,36 @@ import (
 )
 
 type CacheRequest struct {
-	Key  string
-	Data interface{}
-	TTL  int
+	CacheKey string `json: "cacheKey"`
+	Data     []byte `json: "data"`
+	TTL      int    `json: "ttl"`
 }
 
 func main() {
-	srv := &http.Server{Addr: ":8080"}
+	srv := &http.Server{Addr: ":9090"}
 
 	repo := cache.NewRedisRepository()
 
-	http.HandleFunc("/set", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			var request CacheRequest
-
 			requestBody, err := ioutil.ReadAll(r.Body)
 
 			if err != nil {
 				fmt.Println(err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
 
 			json.Unmarshal(requestBody, &request)
-			repo.SetKeyTTL(request.Key, request.Data, request.TTL)
-		}
-	})
-
-	http.HandleFunc("/get", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
+			repo.SetKeyTTL(request.CacheKey, request.Data, request.TTL)
+		} else if r.Method == "GET" {
 			w.Header().Set("Content-Type", "application/json")
 
-			key := r.URL.Query().Get("key")
+			key := r.URL.Query().Get("cacheKey")
+			data := repo.Get(key)
 
-			var data interface{}
-			repo.Get(key, &data)
-
-			json.NewEncoder(w).Encode(data)
+			w.Write(data)
 		}
 	})
 
