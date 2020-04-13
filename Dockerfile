@@ -15,7 +15,12 @@ RUN go build -v cmd/sidecache/main.go
 FROM alpine:latest AS alpine
 
 ENV LANG C.UTF-8
-ENV GOPATH /go
+
+ENV MAIN_CONTAINER_PORT ""
+ENV COUCHBASE_HOST ""
+ENV COUCHBASE_USERNAME ""
+ENV COUCHBASE_PASSWORD ""
+ENV BUCKET_NAME ""
 
 RUN apk --no-cache add tzdata ca-certificates
 COPY --from=builder /app/main   /app/main
@@ -24,10 +29,6 @@ WORKDIR /app
 
 RUN chmod +x main
 
-EXPOSE 8080
+EXPOSE 9191
 
 ENTRYPOINT ["./main","app"]
-
-
-
-
