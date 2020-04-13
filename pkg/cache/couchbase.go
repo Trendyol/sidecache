@@ -12,18 +12,19 @@ type CouchbaseRepository struct {
 }
 
 func NewCouchbaseRepository() *CouchbaseRepository {
-	cluster, err := gocb.Connect("couchbase://" + os.Getenv("couchbaseHost"))
+	// TODO timeouts
+	cluster, err := gocb.Connect("couchbase://" + os.Getenv("COUCHBASE_HOST"))
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Couchbase connection error: %s\n", err)
 		return nil
 	}
 
 	err = cluster.Authenticate(gocb.PasswordAuthenticator{
-		Username: os.Getenv("couchbaseUsername"),
-		Password: os.Getenv("couchbasePassword"),
+		Username: os.Getenv("COUCHBASE_USERNAME"),
+		Password: os.Getenv("COUCHBASE_PASSWORD"),
 	})
 
-	cacheBucket, err := cluster.OpenBucket(os.Getenv("bucketName"), "")
+	cacheBucket, err := cluster.OpenBucket(os.Getenv("BUCKET_NAME"), "")
 	if err != nil {
 		fmt.Println(err)
 		return nil
@@ -32,8 +33,8 @@ func NewCouchbaseRepository() *CouchbaseRepository {
 	return &CouchbaseRepository{bucket: cacheBucket}
 }
 
-func (repository *CouchbaseRepository) SetKey(key string, value interface{}) {
-	_, err := repository.bucket.Insert(key, value, 0)
+func (repository *CouchbaseRepository) SetKey(key string, value []byte) {
+	_, err := repository.bucket.Upsert(key, value, 0)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -46,9 +47,12 @@ func (repository *CouchbaseRepository) SetKeyTTL(key string, value interface{}, 
 	}
 }
 
-func (repository *CouchbaseRepository) Get(key string, data interface{}) {
+func (repository *CouchbaseRepository) Get(key string, data []byte) []byte {
 	_, err := repository.bucket.Get(key, &data)
+
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	return data
 }
