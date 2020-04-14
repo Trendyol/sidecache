@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Trendyol/sidecache/pkg/cache"
 )
@@ -161,8 +162,16 @@ func main() {
 	*/
 
 }
+func elapsed(methodName string) func() {
+	start := time.Now()
+	return func() {
+		fmt.Printf("%s took %v\n", methodName, time.Since(start))
+	}
+}
 
 func CacheHandler(w http.ResponseWriter, r *http.Request) {
+	defer elapsed("CacheHandler")()  // <-- The trailing () is the deferred call
+
 	defer func() {
 		if rec := recover(); rec != nil {
 			fmt.Printf("Recovered from panic: %v \n", rec)
