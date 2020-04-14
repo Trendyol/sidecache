@@ -85,6 +85,7 @@ func main() {
 	prxy = httputil.NewSingleHostReverseProxy(url)
 
 	prxy.ModifyResponse = func(r *http.Response) error {
+		defer elapsed("ModifyResponse")()
 		//if r.Header.Get("Cache-TTL") == "300" {
 		fmt.Println("modify response")
 		b, err := ioutil.ReadAll(r.Body)
@@ -162,6 +163,7 @@ func main() {
 	*/
 
 }
+
 func elapsed(methodName string) func() {
 	start := time.Now()
 	return func() {
@@ -170,7 +172,7 @@ func elapsed(methodName string) func() {
 }
 
 func CacheHandler(w http.ResponseWriter, r *http.Request) {
-	defer elapsed("CacheHandler")()  // <-- The trailing () is the deferred call
+	defer elapsed("CacheHandler")() // <-- The trailing () is the deferred call
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -199,6 +201,8 @@ func CacheHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func hashURL(url string) string {
+	defer elapsed("hashURL")() // <-- The trailing () is the deferred call
+
 	// TODO app name prefix
 	// TODO order query param
 	hasher := md5.New()
@@ -207,6 +211,7 @@ func hashURL(url string) string {
 }
 
 func checkCache(url string) []byte {
+	defer elapsed("checkCache")()
 	var responseData []byte
 	responseData = repo.Get(url, responseData)
 	return responseData
