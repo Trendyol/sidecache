@@ -1,6 +1,6 @@
 package cache
 
 type CacheRepository interface {
-	SetKey(key string, value interface{}, ttl int)
+	SetKey(key string, value []byte, ttl int)
 	Get(key string) []byte
 }
