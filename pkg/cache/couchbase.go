@@ -33,21 +33,15 @@ func NewCouchbaseRepository() *CouchbaseRepository {
 	return &CouchbaseRepository{bucket: cacheBucket}
 }
 
-func (repository *CouchbaseRepository) SetKey(key string, value []byte) {
-	_, err := repository.bucket.Upsert(key, value, 0)
+func (repository *CouchbaseRepository) SetKey(key string, value []byte, ttl int) {
+	_, err := repository.bucket.Upsert(key, value, uint32(ttl))
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-func (repository *CouchbaseRepository) SetKeyTTL(key string, value interface{}, ttl int) {
-	_, err := repository.bucket.Insert(key, value, uint32(ttl))
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func (repository *CouchbaseRepository) Get(key string, data []byte) []byte {
+func (repository *CouchbaseRepository) Get(key string) []byte {
+	var data []byte
 	_, err := repository.bucket.Get(key, &data)
 
 	if err != nil {

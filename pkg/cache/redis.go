@@ -24,7 +24,7 @@ func NewRedisRepository() *RedisRepository {
 	return &RedisRepository{client: client}
 }
 
-func (repository *RedisRepository) SetKey(key string, value interface{}) {
+func (repository *RedisRepository) SetKey(key string, value interface{}, ttl int) {
 	byteData, err := json.Marshal(value)
 
 	if err != nil {
@@ -32,17 +32,9 @@ func (repository *RedisRepository) SetKey(key string, value interface{}) {
 		return
 	}
 
-	status := repository.client.Set(key, string(byteData), 0)
-	_, err = status.Result()
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func (repository *RedisRepository) SetKeyTTL(key string, value []byte, ttl int) {
 	duration, _ := time.ParseDuration(strconv.FormatInt(int64(ttl), 10))
-	status := repository.client.Set(key, value, duration)
-	_, err := status.Result()
+	status := repository.client.Set(key, string(byteData), duration)
+	_, err = status.Result()
 	if err != nil {
 		fmt.Println(err)
 	}
