@@ -4,6 +4,7 @@ go 1.14
 
 require (
 	github.com/go-redis/redis v6.15.7+incompatible
+	github.com/golang/mock v1.4.3
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/onsi/ginkgo v1.12.0
