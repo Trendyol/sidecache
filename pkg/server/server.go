@@ -107,6 +107,11 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	if r.Header.Get("X-No-Cache") == "true" {
+		server.Proxy.ServeHTTP(w, r)
+		return
+	}
+
 	hashedURL := server.HashURL(server.ReorderQueryString(r.URL))
 	cachedData := server.CheckCache(hashedURL)
 
