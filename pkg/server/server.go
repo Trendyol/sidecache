@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
@@ -34,7 +35,7 @@ func NewServer(repo cache.CacheRepository, proxy *httputil.ReverseProxy, counter
 	}
 }
 
-func (server CacheServer) Start() {
+func (server CacheServer) Start(stopChan chan (int)) {
 	server.Proxy.ModifyResponse = func(r *http.Response) error {
 		defer server.elapsed("ModifyResponse")()
 		//if r.Header.Get("Cache-TTL") == "300" {
@@ -64,7 +65,16 @@ func (server CacheServer) Start() {
 	http.HandleFunc("/", server.CacheHandler)
 	http.Handle("/metrics", promhttp.Handler())
 
-	server.Logger.Fatal("Error while starting server: ", zap.Error(http.ListenAndServe(":9191", nil)))
+	httpServer := &http.Server{Addr: ":9191"}
+
+	go func() {
+		//server.Logger.Fatal("Error while starting server: ", zap.Error(http.ListenAndServe(":9191", nil)))
+		server.Logger.Warn("Server closed: ", zap.Error(httpServer.ListenAndServe()))
+	}()
+
+	<-stopChan
+
+	httpServer.Shutdown(context.Background())
 }
 
 func (server CacheServer) elapsed(methodName string) func() {
