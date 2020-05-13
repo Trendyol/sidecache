@@ -43,5 +43,6 @@ func main() {
 	proxy := httputil.NewSingleHostReverseProxy(mainContainerURL)
 	cacheServer := server.NewServer(couchbaseRepo, proxy, counter, logger)
 
-	cacheServer.Start()
+	stopChan := make(chan (int))
+	cacheServer.Start(stopChan)
 }
