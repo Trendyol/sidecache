@@ -29,20 +29,21 @@ var gauge = prometheus.NewGauge(
 func main() {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
+	logger.Info("Side cache process started...")
 
 	prometheus.MustRegister(counter)
 
-	couchbaseRepo := cache.NewCouchbaseRepository()
+	couchbaseRepo := cache.NewCouchbaseRepository(logger)
 
 	mainContainerPort := os.Getenv("MAIN_CONTAINER_PORT")
 	mainContainerURL, err := url.Parse("http://127.0.0.1:" + mainContainerPort)
 	if err != nil {
-		logger.Error("Error occured on url.Parse", zap.Error(err))
+		logger.Error("Error occurred on url.Parse", zap.Error(err))
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(mainContainerURL)
 	cacheServer := server.NewServer(couchbaseRepo, proxy, counter, logger)
 
-	stopChan := make(chan (int))
+	stopChan := make(chan int)
 	cacheServer.Start(stopChan)
 }

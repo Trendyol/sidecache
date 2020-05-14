@@ -2,7 +2,9 @@ package cache
 
 import (
 	"fmt"
+	"go.uber.org/zap"
 	"os"
+	"time"
 
 	"gopkg.in/couchbase/gocb.v1"
 )
@@ -11,11 +13,11 @@ type CouchbaseRepository struct {
 	bucket *gocb.Bucket
 }
 
-func NewCouchbaseRepository() *CouchbaseRepository {
-	// TODO timeouts
-	cluster, err := gocb.Connect("couchbase://" + os.Getenv("COUCHBASE_HOST"))
+func NewCouchbaseRepository(logger *zap.Logger) *CouchbaseRepository {
+	couchbaseHost := os.Getenv("COUCHBASE_HOST")
+	cluster, err := gocb.Connect("couchbase://" + couchbaseHost)
 	if err != nil {
-		fmt.Printf("Couchbase connection error: %s\n", err)
+		logger.Error("Couchbase connection error:", zap.Error(err))
 		return nil
 	}
 
@@ -23,12 +25,12 @@ func NewCouchbaseRepository() *CouchbaseRepository {
 		Username: os.Getenv("COUCHBASE_USERNAME"),
 		Password: os.Getenv("COUCHBASE_PASSWORD"),
 	})
-
 	cacheBucket, err := cluster.OpenBucket(os.Getenv("BUCKET_NAME"), "")
 	if err != nil {
-		fmt.Println(err)
+		logger.Error("Couchbase username or password  error:", zap.Error(err))
 		return nil
 	}
+	cacheBucket.SetOperationTimeout(1 * time.Second)
 
 	return &CouchbaseRepository{bucket: cacheBucket}
 }

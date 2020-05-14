@@ -160,3 +160,21 @@ var _ = Describe("Server", func() {
 		Expect(actual["Email"]).To(Equal("emre.savci@trendyol.com"))
 	})
 })
+
+var _ = Describe("Server", func() {
+
+	var value int
+	var cacheServer *server.CacheServer
+
+	BeforeEach(func() {
+		cacheServer = server.NewServer(nil, nil, nil, nil)
+
+
+
+		value = cacheServer.GetHeaderTTL("max-age=100")
+	})
+
+	It("should get cache ttl in second", func() {
+		Expect(value).To(Equal(100))
+	})
+})

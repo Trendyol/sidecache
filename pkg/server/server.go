@@ -6,18 +6,20 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
+	"github.com/Trendyol/sidecache/pkg/cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"time"
-
-	"github.com/Trendyol/sidecache/pkg/cache"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
+	"strconv"
+	"strings"
 )
+
+const CacheHeaderKey = "tycachecontrol"
 
 type CacheServer struct {
 	Repo    cache.CacheRepository
@@ -35,29 +37,29 @@ func NewServer(repo cache.CacheRepository, proxy *httputil.ReverseProxy, counter
 	}
 }
 
-func (server CacheServer) Start(stopChan chan (int)) {
+func (server CacheServer) Start(stopChan chan int) {
 	server.Proxy.ModifyResponse = func(r *http.Response) error {
-		defer server.elapsed("ModifyResponse")()
-		//if r.Header.Get("Cache-TTL") == "300" {
+		cacheHeaderValue := r.Header.Get(CacheHeaderKey)
+		if cacheHeaderValue != "" {
+			maxAgeInSecond := server.GetHeaderTTL(cacheHeaderValue)
+			b, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				return err
+			}
 
-		b, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			return err
+			go func(reqUrl *url.URL, data []byte) {
+				hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
+				server.Repo.SetKey(hashedURL, data, maxAgeInSecond)
+			}(r.Request.URL, b)
+
+			err = r.Body.Close()
+			if err != nil {
+				return err
+			}
+
+			body := ioutil.NopCloser(bytes.NewReader(b))
+			r.Body = body
 		}
-
-		go func(reqUrl *url.URL, data []byte) {
-			hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
-			server.Repo.SetKey(hashedURL, data, 0)
-		}(r.Request.URL, b)
-
-		err = r.Body.Close()
-		if err != nil {
-			return err
-		}
-
-		body := ioutil.NopCloser(bytes.NewReader(b))
-		r.Body = body
-		//}
 
 		return nil
 	}
@@ -77,18 +79,8 @@ func (server CacheServer) Start(stopChan chan (int)) {
 	httpServer.Shutdown(context.Background())
 }
 
-func (server CacheServer) elapsed(methodName string) func() {
-	start := time.Now()
-	return func() {
-		server.Logger.Info("",
-			zap.String("MethodName", methodName),
-			zap.Int64("ElapsedTime in MS", time.Since(start).Milliseconds()),
-		)
-	}
-}
 
 func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
-	defer server.elapsed("CacheHandler")() // <-- The trailing () is the deferred call
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -107,16 +99,10 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	if r.Header.Get("X-No-Cache") == "true" {
-		server.Proxy.ServeHTTP(w, r)
-		return
-	}
-
 	hashedURL := server.HashURL(server.ReorderQueryString(r.URL))
 	cachedData := server.CheckCache(hashedURL)
 
 	if cachedData != nil {
-		server.Logger.Info("Cache found")
 		w.Header().Add("X-Cache-Response-For", r.URL.String())
 		io.Copy(w, bytes.NewBuffer(cachedData))
 		server.Counter.Inc()
@@ -124,6 +110,16 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		server.Proxy.ServeHTTP(w, r)
 	}
 }
+
+func (server CacheServer) GetHeaderTTL(cacheHeaderValue string) int {
+	cacheValues := strings.Split(cacheHeaderValue, "=")
+	var maxAgeInSecond = 0
+	if len(cacheValues) > 1 {
+		maxAgeInSecond, _ = strconv.Atoi(cacheValues[1])
+	}
+	return maxAgeInSecond
+}
+
 
 func (server CacheServer) HashURL(url string) string {
 	// TODO app name prefix
@@ -133,7 +129,6 @@ func (server CacheServer) HashURL(url string) string {
 }
 
 func (server CacheServer) CheckCache(url string) []byte {
-	defer server.elapsed("checkCache")()
 	return server.Repo.Get(url)
 }
 
