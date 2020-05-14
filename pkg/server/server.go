@@ -70,15 +70,16 @@ func (server CacheServer) Start(stopChan chan int) {
 	httpServer := &http.Server{Addr: ":9191"}
 
 	go func() {
-		//server.Logger.Fatal("Error while starting server: ", zap.Error(http.ListenAndServe(":9191", nil)))
 		server.Logger.Warn("Server closed: ", zap.Error(httpServer.ListenAndServe()))
 	}()
 
 	<-stopChan
 
-	httpServer.Shutdown(context.Background())
+	err := httpServer.Shutdown(context.Background())
+	if err != nil {
+		server.Logger.Error("shutdown hook error", zap.Error(err))
+	}
 }
-
 
 func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -119,7 +120,6 @@ func (server CacheServer) GetHeaderTTL(cacheHeaderValue string) int {
 	}
 	return maxAgeInSecond
 }
-
 
 func (server CacheServer) HashURL(url string) string {
 	// TODO app name prefix

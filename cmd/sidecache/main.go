@@ -28,8 +28,9 @@ var gauge = prometheus.NewGauge(
 
 func main() {
 	logger, _ := zap.NewProduction()
-	defer logger.Sync()
 	logger.Info("Side cache process started...")
+
+	defer logger.Sync()
 
 	prometheus.MustRegister(counter)
 

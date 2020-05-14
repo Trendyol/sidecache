@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"fmt"
 	"go.uber.org/zap"
 	"os"
 	"time"
@@ -11,6 +10,7 @@ import (
 
 type CouchbaseRepository struct {
 	bucket *gocb.Bucket
+	logger *zap.Logger
 }
 
 func NewCouchbaseRepository(logger *zap.Logger) *CouchbaseRepository {
@@ -32,13 +32,13 @@ func NewCouchbaseRepository(logger *zap.Logger) *CouchbaseRepository {
 	}
 	cacheBucket.SetOperationTimeout(1 * time.Second)
 
-	return &CouchbaseRepository{bucket: cacheBucket}
+	return &CouchbaseRepository{bucket: cacheBucket, logger: logger}
 }
 
 func (repository *CouchbaseRepository) SetKey(key string, value []byte, ttl int) {
 	_, err := repository.bucket.Upsert(key, value, uint32(ttl))
 	if err != nil {
-		fmt.Println(err)
+		repository.logger.Error("Error occurred when Upsert", zap.String("key", key))
 	}
 }
 
@@ -47,7 +47,7 @@ func (repository *CouchbaseRepository) Get(key string) []byte {
 	_, err := repository.bucket.Get(key, &data)
 
 	if err != nil {
-		fmt.Println(err)
+		repository.logger.Warn("Error occurred when Get", zap.String("key", key))
 	}
 
 	return data
