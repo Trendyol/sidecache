@@ -1,24 +1,24 @@
 stages:
-#    - test
-#    - build
+    - test
+    - build
     - trigger
 
-# test:
-#   stage: test
-#   image: golang
-#   script:
-#     - go test
+test:
+  stage: test
+  image: golang
+  script:
+    - go test
 
-# build:
-#   stage: build
-#   image:
-#     name: gcr.io/kaniko-project/executor:debug
-#     entrypoint: [""]
-#   only:
-#     - master
-#   script:
-#     - echo "{\"auths\":{\"$SF_REGISTRY_URL\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
-#     - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  only:
+    - master
+  script:
+    - echo "{\"auths\":{\"$SF_REGISTRY_URL\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA
 
 trigger:
   stage: trigger
