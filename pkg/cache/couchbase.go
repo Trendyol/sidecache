@@ -1,9 +1,10 @@
 package cache
 
 import (
-	"go.uber.org/zap"
 	"os"
 	"time"
+
+	"go.uber.org/zap"
 
 	"gopkg.in/couchbase/gocb.v1"
 )
@@ -47,7 +48,7 @@ func (repository *CouchbaseRepository) Get(key string) []byte {
 	_, err := repository.bucket.Get(key, &data)
 
 	if err != nil {
-		repository.logger.Warn("Error occurred when Get", zap.String("key", key))
+		repository.logger.Warn("Error occurred when Get", zap.String("key", key), zap.Error(err))
 	}
 
 	return data
