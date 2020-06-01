@@ -6,34 +6,38 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"errors"
-	"github.com/Trendyol/sidecache/pkg/cache"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/Trendyol/sidecache/pkg/cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/zap"
 )
 
 const CacheHeaderKey = "tycachecontrol"
 
 type CacheServer struct {
-	Repo    cache.CacheRepository
-	Proxy   *httputil.ReverseProxy
-	Counter prometheus.Counter
-	Logger  *zap.Logger
+	Repo           cache.CacheRepository
+	Proxy          *httputil.ReverseProxy
+	Counter        prometheus.Counter
+	Logger         *zap.Logger
+	CacheKeyPrefix string
 }
 
 func NewServer(repo cache.CacheRepository, proxy *httputil.ReverseProxy, counter prometheus.Counter, logger *zap.Logger) *CacheServer {
 	return &CacheServer{
-		Repo:    repo,
-		Proxy:   proxy,
-		Counter: counter,
-		Logger:  logger,
+		Repo:           repo,
+		Proxy:          proxy,
+		Counter:        counter,
+		Logger:         logger,
+		CacheKeyPrefix: os.Getenv("CACHE_KEY_PREFIX"),
 	}
 }
 
@@ -122,9 +126,8 @@ func (server CacheServer) GetHeaderTTL(cacheHeaderValue string) int {
 }
 
 func (server CacheServer) HashURL(url string) string {
-	// TODO app name prefix
 	hasher := md5.New()
-	hasher.Write([]byte(url))
+	hasher.Write([]byte(server.CacheKeyPrefix + "/" + url))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 

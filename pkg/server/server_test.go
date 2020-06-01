@@ -48,11 +48,12 @@ var _ = Describe("Server", func() {
 
 	BeforeEach(func() {
 		cacheServer = server.NewServer(nil, nil, nil, nil)
+		cacheServer.CacheKeyPrefix = "test-prefix"
 
 		testUrl := "testurl"
 
 		hasher := md5.New()
-		hasher.Write([]byte(testUrl))
+		hasher.Write([]byte("test-prefix" + "/" + testUrl))
 		expectedHash = hex.EncodeToString(hasher.Sum(nil))
 
 		actualHash = cacheServer.HashURL(testUrl)
@@ -168,8 +169,6 @@ var _ = Describe("Server", func() {
 
 	BeforeEach(func() {
 		cacheServer = server.NewServer(nil, nil, nil, nil)
-
-
 
 		value = cacheServer.GetHeaderTTL("max-age=100")
 	})
