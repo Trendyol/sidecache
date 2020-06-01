@@ -7,7 +7,7 @@ test:
   stage: test
   image: golang
   script:
-    - go test
+    - go test ./...
 
 build:
   stage: build
