@@ -17,8 +17,8 @@ build:
   only:
     - master
   script:
-    - echo "{\"auths\":{\"$SF_REGISTRY_URL\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA
+    - echo "{\"auths\":{\"$SF_REGISTRY_URL\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}}, {\"$ABC_REGISTRY_URL\":{\"username\":\"$ABC_REGISTRY_USER\", \"password\":\"$ABC_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA --destination $ABC_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA
 
 trigger:
   stage: trigger
