@@ -21,7 +21,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const CacheHeaderKey = "tycachecontrol"
+const CacheHeaderKey = "tysidecarcachable"
 
 type CacheServer struct {
 	Repo           cache.CacheRepository
