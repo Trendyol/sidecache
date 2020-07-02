@@ -109,7 +109,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 
 	if cachedData != nil {
 		w.Header().Add("X-Cache-Response-For", r.URL.String())
-		w.Header().Add("Content-Type", "application/json")
+		w.Header().Add("Content-Type", "application/json;charset=UTF-8")
 		io.Copy(w, bytes.NewBuffer(cachedData))
 		server.Counter.Inc()
 	} else {
