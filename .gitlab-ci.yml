@@ -5,12 +5,16 @@ stages:
 
 test:
   stage: test
+  tags:
+    - browsing-team
   image: golang
   script:
     - go test ./...
 
 build:
   stage: build
+  tags:
+    - browsing-team
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
