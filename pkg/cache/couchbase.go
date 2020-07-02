@@ -47,7 +47,7 @@ func (repository *CouchbaseRepository) Get(key string) []byte {
 	var data []byte
 	_, err := repository.bucket.Get(key, &data)
 
-	if err != nil {
+	if err != nil && err.Error() != "key not found" {
 		repository.logger.Warn("Error occurred when Get", zap.String("key", key), zap.Error(err))
 	}
 
