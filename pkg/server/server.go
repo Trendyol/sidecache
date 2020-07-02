@@ -47,7 +47,9 @@ func (server CacheServer) Start(stopChan chan int) {
 		if cacheHeaderValue != "" {
 			maxAgeInSecond := server.GetHeaderTTL(cacheHeaderValue)
 			b, err := ioutil.ReadAll(r.Body)
+			server.Logger.Info("Response body is", zap.String("responseBody", string(b)))
 			if err != nil {
+				server.Logger.Error("Error while reading repsonse body", zap.Error(err))
 				return err
 			}
 
@@ -58,6 +60,7 @@ func (server CacheServer) Start(stopChan chan int) {
 
 			err = r.Body.Close()
 			if err != nil {
+				server.Logger.Error("Error while closing repsonse body", zap.Error(err))
 				return err
 			}
 
