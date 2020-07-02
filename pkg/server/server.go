@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -46,8 +47,16 @@ func (server CacheServer) Start(stopChan chan int) {
 		cacheHeaderValue := r.Header.Get(CacheHeaderKey)
 		if cacheHeaderValue != "" {
 			maxAgeInSecond := server.GetHeaderTTL(cacheHeaderValue)
-			b, err := ioutil.ReadAll(r.Body)
-			server.Logger.Info("Response body is", zap.String("responseBody", string(b)))
+
+			var b []byte
+			var err error
+			if r.Header.Get("content-encoding") == "gzip" {
+				reader, _ := gzip.NewReader(r.Body)
+				b, err = ioutil.ReadAll(reader)
+			} else {
+				b, err = ioutil.ReadAll(r.Body)
+			}
+
 			if err != nil {
 				server.Logger.Error("Error while reading repsonse body", zap.Error(err))
 				return err
@@ -55,7 +64,13 @@ func (server CacheServer) Start(stopChan chan int) {
 
 			go func(reqUrl *url.URL, data []byte) {
 				hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
-				server.Repo.SetKey(hashedURL, data, maxAgeInSecond)
+
+				buf := bytes.NewBuffer([]byte{})
+				gzipWriter := gzip.NewWriter(buf)
+				_, err = gzipWriter.Write(data)
+				gzipWriter.Close()
+
+				server.Repo.SetKey(hashedURL, buf.Bytes(), maxAgeInSecond)
 			}(r.Request.URL, b)
 
 			err = r.Body.Close()
@@ -64,7 +79,18 @@ func (server CacheServer) Start(stopChan chan int) {
 				return err
 			}
 
-			body := ioutil.NopCloser(bytes.NewReader(b))
+			var body io.ReadCloser
+			if r.Header.Get("content-encoding") == "gzip" {
+				buf := bytes.NewBuffer([]byte{})
+				gzipWriter := gzip.NewWriter(buf)
+				_, err = gzipWriter.Write(b)
+				gzipWriter.Close()
+
+				body = ioutil.NopCloser(buf)
+			} else {
+				body = ioutil.NopCloser(bytes.NewReader(b))
+			}
+
 			r.Body = body
 		}
 
@@ -113,6 +139,8 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 	if cachedData != nil {
 		w.Header().Add("X-Cache-Response-For", r.URL.String())
 		w.Header().Add("Content-Type", "application/json;charset=UTF-8")
+		w.Header().Add("Content-Encoding", "gzip")
+
 		io.Copy(w, bytes.NewBuffer(cachedData))
 		server.Counter.Inc()
 	} else {
