@@ -3,13 +3,13 @@ stages:
     - build
     - trigger
 
-test:
-  stage: test
-  tags:
-    - browsing-team
-  image: golang
-  script:
-    - go test ./...
+# test:
+#   stage: test
+#   tags:
+#     - browsing-team
+#   image: golang
+#   script:
+#     - go test ./...
 
 build:
   stage: build
