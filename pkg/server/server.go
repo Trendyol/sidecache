@@ -141,9 +141,15 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 	if cachedData != nil {
 		w.Header().Add("X-Cache-Response-For", r.URL.String())
 		w.Header().Add("Content-Type", "application/json;charset=UTF-8")
-		w.Header().Add("Content-Encoding", "gzip")
 
-		io.Copy(w, bytes.NewBuffer(cachedData))
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			reader, _ := gzip.NewReader(bytes.NewReader(cachedData))
+			io.Copy(w, reader)
+		} else {
+			w.Header().Add("Content-Encoding", "gzip")
+			io.Copy(w, bytes.NewReader(cachedData))
+		}
+
 		server.Prometheus.CacheHitCounter.Inc()
 	} else {
 		server.Proxy.ServeHTTP(w, r)
