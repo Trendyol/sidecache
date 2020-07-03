@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/Trendyol/sidecache/pkg/cache"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
@@ -27,16 +26,16 @@ const CacheHeaderKey = "tysidecarcachable"
 type CacheServer struct {
 	Repo           cache.CacheRepository
 	Proxy          *httputil.ReverseProxy
-	Counter        prometheus.Counter
+	Prometheus     *Prometheus
 	Logger         *zap.Logger
 	CacheKeyPrefix string
 }
 
-func NewServer(repo cache.CacheRepository, proxy *httputil.ReverseProxy, counter prometheus.Counter, logger *zap.Logger) *CacheServer {
+func NewServer(repo cache.CacheRepository, proxy *httputil.ReverseProxy, prom *Prometheus, logger *zap.Logger) *CacheServer {
 	return &CacheServer{
 		Repo:           repo,
 		Proxy:          proxy,
-		Counter:        counter,
+		Prometheus:     prom,
 		Logger:         logger,
 		CacheKeyPrefix: os.Getenv("CACHE_KEY_PREFIX"),
 	}
@@ -64,12 +63,7 @@ func (server CacheServer) Start(stopChan chan int) {
 
 			go func(reqUrl *url.URL, data []byte) {
 				hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
-
-				buf := bytes.NewBuffer([]byte{})
-				gzipWriter := gzip.NewWriter(buf)
-				_, err = gzipWriter.Write(data)
-				gzipWriter.Close()
-
+				buf := server.gzipWriter(b)
 				server.Repo.SetKey(hashedURL, buf.Bytes(), maxAgeInSecond)
 			}(r.Request.URL, b)
 
@@ -81,11 +75,7 @@ func (server CacheServer) Start(stopChan chan int) {
 
 			var body io.ReadCloser
 			if r.Header.Get("content-encoding") == "gzip" {
-				buf := bytes.NewBuffer([]byte{})
-				gzipWriter := gzip.NewWriter(buf)
-				_, err = gzipWriter.Write(b)
-				gzipWriter.Close()
-
+				buf := server.gzipWriter(b)
 				body = ioutil.NopCloser(buf)
 			} else {
 				body = ioutil.NopCloser(bytes.NewReader(b))
@@ -114,7 +104,19 @@ func (server CacheServer) Start(stopChan chan int) {
 	}
 }
 
+func (server CacheServer) gzipWriter(b []byte) *bytes.Buffer {
+	buf := bytes.NewBuffer([]byte{})
+	gzipWriter := gzip.NewWriter(buf)
+	_, err := gzipWriter.Write(b)
+	if err != nil {
+		server.Logger.Error("Gzip Writer Encountered With an Error", zap.Error(err))
+	}
+	gzipWriter.Close()
+	return buf
+}
+
 func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
+	server.Prometheus.TotalRequestCounter.Inc()
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -142,7 +144,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Encoding", "gzip")
 
 		io.Copy(w, bytes.NewBuffer(cachedData))
-		server.Counter.Inc()
+		server.Prometheus.CacheHitCounter.Inc()
 	} else {
 		server.Proxy.ServeHTTP(w, r)
 	}
