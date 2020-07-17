@@ -22,6 +22,7 @@ import (
 )
 
 const CacheHeaderKey = "tysidecarcachable"
+const applicatonDefaultPort = ":9191"
 
 type CacheServer struct {
 	Repo           cache.CacheRepository
@@ -90,7 +91,9 @@ func (server CacheServer) Start(stopChan chan int) {
 	http.HandleFunc("/", server.CacheHandler)
 	http.Handle("/metrics", promhttp.Handler())
 
-	httpServer := &http.Server{Addr: ":9191"}
+	port := determinatePort()
+	httpServer := &http.Server{Addr: port}
+	server.Logger.Info("SideCache process started port: ", zap.String("port", port))
 
 	go func() {
 		server.Logger.Warn("Server closed: ", zap.Error(httpServer.ListenAndServe()))
@@ -102,6 +105,15 @@ func (server CacheServer) Start(stopChan chan int) {
 	if err != nil {
 		server.Logger.Error("shutdown hook error", zap.Error(err))
 	}
+}
+
+func determinatePort() string {
+	customPort := os.Getenv("SIDE_CACHE_PORT")
+	if customPort == "" {
+		return applicatonDefaultPort
+
+	}
+	return ":" + customPort
 }
 
 func (server CacheServer) gzipWriter(b []byte) *bytes.Buffer {
