@@ -31,7 +31,7 @@ func NewCouchbaseRepository(logger *zap.Logger) *CouchbaseRepository {
 		logger.Error("Couchbase username or password  error:", zap.Error(err))
 		return nil
 	}
-	cacheBucket.SetOperationTimeout(1 * time.Second)
+	cacheBucket.SetOperationTimeout(100 * time.Millisecond)
 
 	return &CouchbaseRepository{bucket: cacheBucket, logger: logger}
 }
