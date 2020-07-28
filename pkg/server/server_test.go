@@ -1,17 +1,20 @@
 package server_test
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -104,17 +107,23 @@ var _ = Describe("Server", func() {
 		}
 	})
 
-	//It("should return cached response", func() {
-	//	repo.
-	//		EXPECT().
-	//		Get(gomock.Any()).
-	//		Return([]byte("{'name':'emre'}"))
-	//
-	//	resp, _ := http.Get("http://localhost:9191/api?name=emre&year=2020")
-	//	respBody, _ := ioutil.ReadAll(resp.Body)
-	//
-	//	Expect(string(respBody)).To(Equal("{'name':'emre'}"))
-	//})
+	It("should return cached response", func() {
+		str := "{'name':'emre'}"
+		buf := bytes.NewBuffer([]byte{})
+		gzipWriter := gzip.NewWriter(buf)
+		gzipWriter.Write([]byte(str))
+		gzipWriter.Close()
+
+		repo.
+			EXPECT().
+			Get(gomock.Any()).
+			Return(buf.Bytes())
+
+		resp, _ := http.Get("http://localhost:9191/api?name=emre&year=2020")
+		respBody, _ := ioutil.ReadAll(resp.Body)
+
+		Expect(string(respBody)).To(Equal(str))
+	})
 
 	It("should return proxy response", func() {
 		repo.
