@@ -1,6 +1,8 @@
 # sidecache
 Sidecar cache for kubernetes applications. It acts as a proxy sidecar between application and client, routes incoming requests to cache storage or application according to Istio VirtualService routing rules.
 
+Medium article: https://medium.com/trendyol-tech/trendyol-platform-team-caching-service-to-service-communications-on-kubernetes-istio-82327589b935
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-ligthgreen.svg)](https://opensource.org/licenses/MIT)
 
 ## Table Of Contents
