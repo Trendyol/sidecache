@@ -5,24 +5,22 @@ stages:
 
 test:
   stage: test
-  tags:
-    - browsing-team
   image: golang
   script:
     - go test ./...
 
 build:
   stage: build
-  tags:
-    - browsing-team
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
   only:
     - master
   script:
-    - echo "{\"auths\":{\"$SF_REGISTRY_URL\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}, \"$ABC_REGISTRY_URL\":{\"username\":\"$ABC_REGISTRY_USER\", \"password\":\"$ABC_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA --destination $ABC_REGISTRY_URL/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA
+    - echo "{\"auths\":{\"$SF_REGISTRY_HOST\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}, \"$ALICLOUD_REGISTRY_HOST\":{\"username\":\"$ALICLOUD_REGISTRY_USER\", \"password\":\"$ALICLOUD_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA --destination $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA
+    - 'echo "Sfrontregistry Image: $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA"'
+    - 'echo "Alicloud Image: $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA"'
 
 trigger:
   stage: trigger
