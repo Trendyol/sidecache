@@ -22,19 +22,19 @@ build:
     - 'echo "Sfrontregistry Image: $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA"'
     - 'echo "Alicloud Image: $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA"'
 
-trigger:
-  stage: trigger
-  image:
-    name: alpine/git:v2.24.3
-  only:
-    - master
-  script:
-    - git config --global user.email "platform@trendyol.com"
-    - git config --global user.name "Platform"
-    - GIT_URL=https://$GIT_USER:$GIT_PASS@gitlab-sfront.trendyol.com/Base/sidecache-admission-webhook.git
-    - git clone $GIT_URL
-    - cd sidecache-admission-webhook
-    - echo $CI_COMMIT_SHORT_SHA > .build-version.txt
-    - git add .build-version.txt
-    - git commit -am "Gitlab CI change build version ${CI_COMMIT_SHORT_SHA}"
-    - git push $GIT_URL HEAD:master
+# trigger:
+#   stage: trigger
+#   image:
+#     name: alpine/git:v2.24.3
+#   only:
+#     - master
+#   script:
+#     - git config --global user.email "platform@trendyol.com"
+#     - git config --global user.name "Platform"
+#     - GIT_URL=https://$GIT_USER:$GIT_PASS@gitlab-sfront.trendyol.com/Base/sidecache-admission-webhook.git
+#     - git clone $GIT_URL
+#     - cd sidecache-admission-webhook
+#     - echo $CI_COMMIT_SHORT_SHA > .build-version.txt
+#     - git add .build-version.txt
+#     - git commit -am "Gitlab CI change build version ${CI_COMMIT_SHORT_SHA}"
+#     - git push $GIT_URL HEAD:master
