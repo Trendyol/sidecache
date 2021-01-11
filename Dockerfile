@@ -1,4 +1,4 @@
-FROM golang:1.13.4-alpine AS builder
+FROM registry.trendyol.com/platform/base/image/golang:1.13.4-alpine3.10 AS builder
 
 ENV GOPATH /go
 ENV CGO_ENABLED=0
@@ -12,7 +12,7 @@ COPY . .
 RUN go mod download
 RUN go build -v cmd/sidecache/main.go
 
-FROM alpine:latest AS alpine
+FROM registry.trendyol.com/platform/base/image/alpine:3.10.1 AS alpine
 
 ENV LANG C.UTF-8
 
