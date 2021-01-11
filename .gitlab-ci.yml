@@ -8,6 +8,8 @@ test:
   image: golang
   script:
     - go test ./...
+variables:
+  CLOUD_DOCKER_IMAGE: $ALICLOUD_REGISTRY_HOST/trendyol-abc/$CI_PROJECT_NAME
 
 build:
   stage: build
