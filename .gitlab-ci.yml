@@ -12,7 +12,8 @@ test:
 build:
   stage: build
   image:
-    name: gcr.io/kaniko-project/executor:debug
+    name: ${GITLAB_REGISTRY_URL}/platform/base/image/docker:19.03.9-dind
+
     entrypoint: [""]
   only:
     - master
