@@ -17,10 +17,16 @@ build:
   only:
     - master
   script:
-    - echo "{\"auths\":{\"$SF_REGISTRY_HOST\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}, \"$ALICLOUD_REGISTRY_HOST\":{\"username\":\"$ALICLOUD_REGISTRY_USER\", \"password\":\"$ALICLOUD_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA --destination $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA
-    - 'echo "Sfrontregistry Image: $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA"'
-    - 'echo "Alicloud Image: $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA"'
+    - docker login $GITLAB_REGISTRY_URL -u $GITLAB_REGISTRY_USER -p $GITLAB_REGISTRY_PASS
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -t $CLOUD_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker login $ALICLOUD_REGISTRY_HOST -u $ALICLOUD_REGISTRY_USER -p $ALICLOUD_REGISTRY_PASS
+    - docker push $CLOUD_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA
+
+    # - echo "{\"auths\":{\"$SF_REGISTRY_HOST\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}, \"$ALICLOUD_REGISTRY_HOST\":{\"username\":\"$ALICLOUD_REGISTRY_USER\", \"password\":\"$ALICLOUD_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
+    # - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA --destination $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA
+    # - 'echo "Sfrontregistry Image: $SF_REGISTRY_HOST/sidecache:$CI_COMMIT_SHORT_SHA"'
+    # - 'echo "Alicloud Image: $ALICLOUD_REGISTRY_HOST/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA"'
 
 # trigger:
 #   stage: trigger
