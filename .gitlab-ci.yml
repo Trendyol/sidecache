@@ -15,7 +15,11 @@ build:
   stage: build
   image:
     name: registry.trendyol.com/platform/base/image/docker:19.03.9-dind
-
+  services:
+    - docker:19.03.9-dind
+  variables:
+    DOCKER_HOST: "tcp://localhost:2375"
+    DOCKER_TLS_CERTDIR: ""
     entrypoint: [""]
   only:
     - master
