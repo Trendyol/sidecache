@@ -10,7 +10,7 @@ test:
     - go test ./...
 variables:
   CLOUD_DOCKER_IMAGE: $ALICLOUD_REGISTRY_HOST/trendyol-abc/$CI_PROJECT_NAME
-
+  
 build:
   stage: build
   image:
@@ -20,7 +20,6 @@ build:
   variables:
     DOCKER_HOST: "tcp://localhost:2375"
     DOCKER_TLS_CERTDIR: ""
-    entrypoint: [""]
   only:
     - master
   script:
