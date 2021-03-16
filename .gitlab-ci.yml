@@ -76,13 +76,14 @@ test:
     - docker login $GITLAB_REGISTRY_HOST -u $GITLAB_REGISTRY_USER -p $GITLAB_REGISTRY_PASS
     - docker build --build-arg VERSION=$VERSION -t $CI_REGISTRY_IMAGE:$VERSION  .
     - docker push $CI_REGISTRY_IMAGE:$VERSION
+  when: manual
 
-latest-build:
-  extends: .docker_build
-  before_script:
-    - export VERSION=$CI_COMMIT_SHORT_SHA
-  except:
-    - tags
+# latest-build:
+#   extends: .docker_build
+#   before_script:
+#     - export VERSION=$CI_COMMIT_SHORT_SHA
+#   except:
+#     - tags
 semantic-build:
   extends: .docker_build
   before_script:
