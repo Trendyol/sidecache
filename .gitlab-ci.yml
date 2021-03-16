@@ -52,7 +52,6 @@ tag:major:
     variables:
       - $CI_COMMIT_MESSAGE =~ /major/
 
-
 test:
   stage: test
   image: golang
