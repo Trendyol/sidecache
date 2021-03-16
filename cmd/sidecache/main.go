@@ -10,9 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
+var version string
+
 func main() {
 	logger, _ := zap.NewProduction()
-	logger.Info("Side cache process started...")
+	logger.Info("Side cache process started...", zap.String("version", version))
 
 	defer logger.Sync()
 
@@ -26,6 +28,9 @@ func main() {
 	}
 
 	prom := server.NewPrometheusClient()
+
+	server.BuildInfo(version)
+
 	proxy := httputil.NewSingleHostReverseProxy(mainContainerURL)
 	cacheServer := server.NewServer(couchbaseRepo, proxy, prom, logger)
 	logger.Info("Cache key prefix", zap.String("prefix", cacheServer.CacheKeyPrefix))

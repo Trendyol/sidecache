@@ -4,13 +4,14 @@ ENV GOPATH /go
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=amd64
+ARG VERSION
 
 RUN mkdir /app
 WORKDIR /app
 
 COPY . .
 RUN go mod download
-RUN go build -v cmd/sidecache/main.go
+RUN go build -ldflags="-X 'main.version=$VERSION'" -v cmd/sidecache/main.go
 
 FROM registry.trendyol.com/platform/base/image/alpine:3.10.1 AS alpine
 
