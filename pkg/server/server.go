@@ -47,7 +47,7 @@ func (server CacheServer) Start(stopChan chan int) {
 		cacheHeaderValue := r.Header.Get(CacheHeaderKey)
 		if cacheHeaderValue != "" {
 			maxAgeInSecond := server.GetHeaderTTL(cacheHeaderValue)
-
+			r.Header.Del("Content-Length") // https://github.com/golang/go/issues/14975
 			var b []byte
 			var err error
 			if r.Header.Get("content-encoding") == "gzip" {
@@ -62,11 +62,11 @@ func (server CacheServer) Start(stopChan chan int) {
 				return err
 			}
 
-			go func(reqUrl *url.URL, data []byte) {
+			buf := server.gzipWriter(b)
+			go func(reqUrl *url.URL, data []byte, ttl int) {
 				hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
-				buf := server.gzipWriter(b)
-				server.Repo.SetKey(hashedURL, buf.Bytes(), maxAgeInSecond)
-			}(r.Request.URL, b)
+				server.Repo.SetKey(hashedURL, data, ttl)
+			}(r.Request.URL, buf.Bytes(), maxAgeInSecond)
 
 			err = r.Body.Close()
 			if err != nil {
@@ -76,7 +76,6 @@ func (server CacheServer) Start(stopChan chan int) {
 
 			var body io.ReadCloser
 			if r.Header.Get("content-encoding") == "gzip" {
-				buf := server.gzipWriter(b)
 				body = ioutil.NopCloser(buf)
 			} else {
 				body = ioutil.NopCloser(bytes.NewReader(b))

@@ -5,38 +5,26 @@ stages:
 
 test:
   stage: test
-  tags:
-    - browsing-team
   image: golang
   script:
     - go test ./...
-
+variables:
+  CLOUD_DOCKER_IMAGE: $ALICLOUD_REGISTRY_HOST/trendyol-abc/$CI_PROJECT_NAME
+  
 build:
   stage: build
-  tags:
-    - browsing-team
   image:
-    name: gcr.io/kaniko-project/executor:debug
-    entrypoint: [""]
+    name: registry.trendyol.com/platform/base/image/docker:19.03.9-dind
+  services:
+    - docker:19.03.9-dind
+  variables:
+    DOCKER_HOST: "tcp://localhost:2375"
+    DOCKER_TLS_CERTDIR: ""
   only:
     - master
   script:
-    - echo "{\"auths\":{\"$SF_REGISTRY_URL\":{\"username\":\"$SF_REGISTRY_USER\",\"password\":\"$SF_REGISTRY_PASS\"}, \"$ABC_REGISTRY_URL\":{\"username\":\"$ABC_REGISTRY_USER\", \"password\":\"$ABC_REGISTRY_PASS\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $SF_REGISTRY_URL/sidecache:$CI_COMMIT_SHORT_SHA --destination $ABC_REGISTRY_URL/trendyol-abc/sidecache:$CI_COMMIT_SHORT_SHA
-
-trigger:
-  stage: trigger
-  image:
-    name: alpine/git:v2.24.3
-  only:
-    - master
-  script:
-    - git config --global user.email "platform@trendyol.com"
-    - git config --global user.name "Platform"
-    - GIT_URL=https://$GIT_USER:$GIT_PASS@gitlab-sfront.trendyol.com/Base/sidecache-admission-webhook.git
-    - git clone $GIT_URL
-    - cd sidecache-admission-webhook
-    - echo $CI_COMMIT_SHORT_SHA > .build-version.txt
-    - git add .build-version.txt
-    - git commit -am "Gitlab CI change build version ${CI_COMMIT_SHORT_SHA}"
-    - git push $GIT_URL HEAD:master
+    - docker login $GITLAB_REGISTRY_HOST -u $GITLAB_REGISTRY_USER -p $GITLAB_REGISTRY_PASS
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -t $CLOUD_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker login $ALICLOUD_REGISTRY_HOST -u $ALICLOUD_REGISTRY_USER -p $ALICLOUD_REGISTRY_PASS
+    - docker push $CLOUD_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA

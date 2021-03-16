@@ -39,7 +39,7 @@ func NewCouchbaseRepository(logger *zap.Logger) *CouchbaseRepository {
 func (repository *CouchbaseRepository) SetKey(key string, value []byte, ttl int) {
 	_, err := repository.bucket.Upsert(key, value, uint32(ttl))
 	if err != nil {
-		repository.logger.Error("Error occurred when Upsert", zap.String("key", key))
+		repository.logger.Warn("Error occurred when Upsert", zap.String("key", key))
 	}
 }
 
