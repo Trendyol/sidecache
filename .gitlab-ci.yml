@@ -1,5 +1,4 @@
 variables:
-  CLOUD_DOCKER_IMAGE: $ALICLOUD_REGISTRY_HOST/trendyol-abc/$CI_PROJECT_NAME
   VERSION: 0.1.0
 
 stages:
@@ -61,7 +60,8 @@ test:
   script:
     - go test ./...
 
-build:
+
+.docker_build:
   stage: build
   image:
     name: registry.trendyol.com/platform/base/image/docker:19.03.9-dind
@@ -74,7 +74,18 @@ build:
     - master
   script:
     - docker login $GITLAB_REGISTRY_HOST -u $GITLAB_REGISTRY_USER -p $GITLAB_REGISTRY_PASS
-    - docker build --build-arg VERSION=$VERSION -t $CI_REGISTRY_IMAGE:$VERSION -t $CLOUD_DOCKER_IMAGE:$VERSION .
+    - docker build --build-arg VERSION=$VERSION -t $CI_REGISTRY_IMAGE:$VERSION  .
     - docker push $CI_REGISTRY_IMAGE:$VERSION
-    - docker login $ALICLOUD_REGISTRY_HOST -u $ALICLOUD_REGISTRY_USER -p $ALICLOUD_REGISTRY_PASS
-    - docker push $CLOUD_DOCKER_IMAGE:$VERSION
+
+latest-build:
+  extends: .docker_build
+  before_script:
+    - export VERSION=$CI_COMMIT_SHORT_SHA
+  except:
+    - tags
+semantic-build:
+  extends: .docker_build
+  before_script:
+    - export VERSION=$CI_COMMIT_TAG
+  only:
+    - tags
