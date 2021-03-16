@@ -74,7 +74,7 @@ build:
     - master
   script:
     - docker login $GITLAB_REGISTRY_HOST -u $GITLAB_REGISTRY_USER -p $GITLAB_REGISTRY_PASS
-    - docker build -ldflags="-X 'main.version=$VERSION'" -t $CI_REGISTRY_IMAGE:$VERSION -t $CLOUD_DOCKER_IMAGE:$VERSION .
+    - docker build --build-arg VERSION=$VERSION -t $CI_REGISTRY_IMAGE:$VERSION -t $CLOUD_DOCKER_IMAGE:$VERSION .
     - docker push $CI_REGISTRY_IMAGE:$VERSION
     - docker login $ALICLOUD_REGISTRY_HOST -u $ALICLOUD_REGISTRY_USER -p $ALICLOUD_REGISTRY_PASS
     - docker push $CLOUD_DOCKER_IMAGE:$VERSION
