@@ -1,16 +1,66 @@
+variables:
+  CLOUD_DOCKER_IMAGE: $ALICLOUD_REGISTRY_HOST/trendyol-abc/$CI_PROJECT_NAME
+  VERSION: 0.1.0
+
 stages:
+    - tag
     - test
     - build
     - trigger
+
+.tag:
+  stage: tag
+  image: alpine/semver:latest
+  script:
+    - apk --no-cache add -q git jq curl
+    - |
+      GITLAB_API_TOKEN=$(curl -sf "$GITLAB_PATG_URL?jwt=$CI_JOB_JWT" | jq -r .token)
+      GIT_URL=http://$GITLAB_USER_LOGIN:$GITLAB_API_TOKEN@$(echo $CI_REPOSITORY_URL| cut -d@ -f2)
+      CURRENT_VERSION=$(git describe --tags $(git rev-list --tags --max-count=1)) || true
+      CURRENT_VERSION=${CURRENT_VERSION:-0.0.0}
+      git config --global user.email "platform@trendyol.com"
+      git config --global user.name "Platform"
+      NEXT_VERSION=$(semver -c -i $RELEASE_TYPE $CURRENT_VERSION)
+      VERSION=$NEXT_VERSION
+      echo "Current version is $CURRENT_VERSION, next version --> $NEXT_VERSION"
+      git tag -a $NEXT_VERSION -m "Auto-Release with type: $RELEASE_TYPE"
+      git push $GIT_URL $NEXT_VERSION
+  except:
+    - tags
+  only:
+    - master
+
+tag:patch:
+  extends: .tag
+  variables:
+    RELEASE_TYPE: patch
+  only:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /patch/
+
+tag:minor:
+  extends: .tag
+  variables:
+    RELEASE_TYPE: minor
+  only:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /minor/
+
+tag:major:
+  extends: .tag
+  variables:
+    RELEASE_TYPE: major
+  only:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /major/
+
 
 test:
   stage: test
   image: golang
   script:
     - go test ./...
-variables:
-  CLOUD_DOCKER_IMAGE: $ALICLOUD_REGISTRY_HOST/trendyol-abc/$CI_PROJECT_NAME
-  
+
 build:
   stage: build
   image:
@@ -24,7 +74,7 @@ build:
     - master
   script:
     - docker login $GITLAB_REGISTRY_HOST -u $GITLAB_REGISTRY_USER -p $GITLAB_REGISTRY_PASS
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -t $CLOUD_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA .
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker build -ldflags="-X 'main.version=$VERSION'" -t $CI_REGISTRY_IMAGE:$VERSION -t $CLOUD_DOCKER_IMAGE:$VERSION .
+    - docker push $CI_REGISTRY_IMAGE:$VERSION
     - docker login $ALICLOUD_REGISTRY_HOST -u $ALICLOUD_REGISTRY_USER -p $ALICLOUD_REGISTRY_PASS
-    - docker push $CLOUD_DOCKER_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $CLOUD_DOCKER_IMAGE:$VERSION
