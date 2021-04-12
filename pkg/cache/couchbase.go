@@ -26,9 +26,15 @@ func NewCouchbaseRepository(logger *zap.Logger) *CouchbaseRepository {
 		Username: os.Getenv("COUCHBASE_USERNAME"),
 		Password: os.Getenv("COUCHBASE_PASSWORD"),
 	})
+
+	if err != nil {
+		logger.Error("Couchbase authentication error:", zap.Error(err))
+		return nil
+	}
+
 	cacheBucket, err := cluster.OpenBucket(os.Getenv("BUCKET_NAME"), "")
 	if err != nil {
-		logger.Error("Couchbase username or password  error:", zap.Error(err))
+		logger.Error("Couchbase could not open bucket error:", zap.Error(err))
 		return nil
 	}
 	cacheBucket.SetOperationTimeout(100 * time.Millisecond)
