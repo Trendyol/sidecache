@@ -22,7 +22,7 @@ import (
 )
 
 const CacheHeaderKey = "tysidecarcachable"
-const applicatonDefaultPort = ":9191"
+const applicationDefaultPort = ":9191"
 
 type CacheServer struct {
 	Repo           cache.CacheRepository
@@ -109,7 +109,7 @@ func (server CacheServer) Start(stopChan chan int) {
 func determinatePort() string {
 	customPort := os.Getenv("SIDE_CACHE_PORT")
 	if customPort == "" {
-		return applicatonDefaultPort
+		return applicationDefaultPort
 
 	}
 	return ":" + customPort
@@ -138,7 +138,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 			case error:
 				err = x
 			default:
-				err = errors.New("Unknown panic")
+				err = errors.New("unknown panic")
 			}
 
 			server.Logger.Info("Recovered from panic", zap.Error(err))
@@ -183,6 +183,9 @@ func (server CacheServer) HashURL(url string) string {
 }
 
 func (server CacheServer) CheckCache(url string) []byte {
+	if server.Repo == nil {
+		return nil
+	}
 	return server.Repo.Get(url)
 }
 
