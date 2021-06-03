@@ -3,7 +3,7 @@ variables:
 
 stages:
     - tag
-    - test
+    #- test
     - build
     - trigger
 
@@ -52,11 +52,11 @@ tag:major:
     variables:
       - $CI_COMMIT_MESSAGE =~ /major/
 
-test:
-  stage: test
-  image: golang
-  script:
-    - go test ./...
+#test:
+#  stage: test
+#  image: golang
+#  script:
+#    - go test ./...
 
 
 .docker_build:
