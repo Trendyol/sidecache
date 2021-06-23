@@ -75,6 +75,7 @@ tag:major:
     - docker build --build-arg VERSION=$VERSION -t $CI_REGISTRY_IMAGE:$VERSION  .
     - docker push $CI_REGISTRY_IMAGE:$VERSION
 
+
 # latest-build:
 #   extends: .docker_build
 #   before_script:
