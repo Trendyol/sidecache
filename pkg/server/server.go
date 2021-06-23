@@ -189,11 +189,14 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				reader, _ := gzip.NewReader(bytes.NewReader(cachedData.Body))
+				delete(cachedData.Headers, "Content-Encoding")
 				writeHeaders(w, cachedData.Headers)
 				io.Copy(w, reader)
 			} else {
 				writeHeaders(w, cachedData.Headers)
-				w.Header().Add("Content-Encoding", "gzip")
+				if _, ok := cachedData.Headers["Content-Encoding"]; !ok {
+					w.Header().Add("Content-Encoding", "gzip")
+				}
 				io.Copy(w, bytes.NewReader(cachedData.Body))
 			}
 		}
