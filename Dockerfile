@@ -16,7 +16,6 @@ RUN go build -ldflags="-X 'main.version=$VERSION'" -v cmd/sidecache/main.go
 FROM registry.trendyol.com/platform/base/image/alpine:3.10.1 AS alpine
 
 ENV LANG C.UTF-8
-
 ENV MAIN_CONTAINER_PORT ""
 ENV COUCHBASE_HOST ""
 ENV COUCHBASE_USERNAME ""
