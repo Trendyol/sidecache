@@ -14,9 +14,9 @@ stages:
     - apk --no-cache add -q git jq curl
     - |
       GITLAB_API_TOKEN=$(curl -sf "$GITLAB_PATG_URL?jwt=$CI_JOB_JWT" | jq -r .token)
-      GIT_URL=http://$GITLAB_USER_LOGIN:$GITLAB_API_TOKEN@$(echo $CI_REPOSITORY_URL| cut -d@ -f2)
+      GIT_URL=https://$GITLAB_USER_LOGIN:$GITLAB_API_TOKEN@$(echo $CI_REPOSITORY_URL| cut -d@ -f2)
       CURRENT_VERSION=$(git describe --tags $(git rev-list --tags --max-count=1)) || true
-      CURRENT_VERSION=${CURRENT_VERSION:-0.0.0}
+      CURRENT_VERSION=${CURRENT_VERSION:-0.3.0}
       git config --global user.email "platform@trendyol.com"
       git config --global user.name "Platform"
       NEXT_VERSION=$(semver -c -i $RELEASE_TYPE $CURRENT_VERSION)
