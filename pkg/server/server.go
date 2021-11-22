@@ -22,7 +22,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const CacheHeaderEnabledKey = "sidecache-headers-enabled"
 const applicationDefaultPort = ":9191"
 
 type CacheServer struct {
@@ -50,8 +49,10 @@ func NewServer(repo cache.Repository, proxy *httputil.ReverseProxy, prom *Promet
 
 func (server CacheServer) Start(stopChan chan int) {
 	server.Proxy.ModifyResponse = func(r *http.Response) error {
+		if r.StatusCode >= 400 {
+			return nil
+		}
 
-		cacheHeadersEnabled := r.Header.Get(CacheHeaderEnabledKey)
 		maxAgeInSecond, err := time.ParseDuration(os.Getenv("CACHE_TTL"))
 
 		if err != nil {
@@ -74,21 +75,12 @@ func (server CacheServer) Start(stopChan chan int) {
 		}
 
 		buf := server.gzipWriter(b)
-		go func(reqUrl *url.URL, data []byte, ttl time.Duration, cacheHeadersEnabled string) {
+		go func(reqUrl *url.URL, data []byte, ttl time.Duration) {
 			hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
 			cacheData := CacheData{Body: data}
-
-			if cacheHeadersEnabled == "true" {
-				headers := make(map[string]string)
-				for h, v := range r.Header {
-					headers[h] = strings.Join(v, ";")
-				}
-				cacheData.Headers = headers
-			}
-
 			cacheDataBytes, _ := json.Marshal(cacheData)
 			server.Repo.SetKey(hashedURL, cacheDataBytes, ttl)
-		}(r.Request.URL, buf.Bytes(), maxAgeInSecond, cacheHeadersEnabled)
+		}(r.Request.URL, buf.Bytes(), maxAgeInSecond)
 
 		err = r.Body.Close()
 		if err != nil {
