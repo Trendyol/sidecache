@@ -49,7 +49,7 @@ func NewServer(repo cache.Repository, proxy *httputil.ReverseProxy, prom *Promet
 
 func (server CacheServer) Start(stopChan chan int) {
 	server.Proxy.ModifyResponse = func(r *http.Response) error {
-		if r.StatusCode >= 400 {
+		if r.StatusCode >= 500 {
 			return nil
 		}
 
