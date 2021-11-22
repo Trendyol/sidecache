@@ -16,8 +16,8 @@ type RedisRepository struct {
 
 func NewRedisRepository(logger *zap.Logger) (*RedisRepository, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     os.Getenv("redisAddr"),
-		Password: os.Getenv("redisPassword"),
+		Addr:     os.Getenv("REDIS_ADDRESS"),
+		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
 	if err := client.Ping().Err(); err != nil {

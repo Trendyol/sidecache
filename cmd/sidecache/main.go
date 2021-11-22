@@ -10,10 +10,9 @@ import (
 	"time"
 )
 
-var version string
-
 func main() {
 	logger, _ := zap.NewProduction()
+	version := os.Getenv("RELEASE_VERSION")
 	logger.Info("Side cache process started...", zap.String("version", version))
 
 	defer logger.Sync()

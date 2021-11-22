@@ -5,8 +5,6 @@ ENV GO111MODULE=on \
     GOARCH="amd64" \
     GOOS=linux
 
-ARG VERSION
-
 WORKDIR /app
 
 # Copy and download dependency using go mod
@@ -19,14 +17,16 @@ RUN go mod verify
 COPY . .
 
 # Build the app
-RUN go build -ldflags="-X 'main.version=$VERSION'" -v cmd/sidecache/main.go
+RUN go build -v cmd/sidecache/main.go
 
 FROM gcr.io/distroless/base
 
+ARG release_version
+ENV RELEASE_VERSION=$release_version
 ENV LANG C.UTF-8
-ENV MAIN_CONTAINER_PORT ""
-ENV REDIS_HOST ""
-ENV REDIS_PORT ""
+ENV MAIN_CONTAINER_PORT "80"
+ENV REDIS_ADDRESS "127.0.0.1:6379"
+ENV REDIS_PASSWORD ""
 
 COPY --from=builder /app/main /app/main
 
