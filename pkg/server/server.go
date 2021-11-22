@@ -14,15 +14,14 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeriontech/sidecache/pkg/cache"
 	"go.uber.org/zap"
 )
 
-const CacheHeaderKey = "tysidecarcachable"
 const CacheHeaderEnabledKey = "sidecache-headers-enabled"
 const applicationDefaultPort = ":9191"
 
@@ -51,58 +50,60 @@ func NewServer(repo cache.Repository, proxy *httputil.ReverseProxy, prom *Promet
 
 func (server CacheServer) Start(stopChan chan int) {
 	server.Proxy.ModifyResponse = func(r *http.Response) error {
-		cacheHeaderValue := r.Header.Get(CacheHeaderKey)
-		if cacheHeaderValue != "" {
-			cacheHeadersEnabled := r.Header.Get(CacheHeaderEnabledKey)
-			maxAgeInSecond := server.GetHeaderTTL(cacheHeaderValue)
-			r.Header.Del("Content-Length") // https://github.com/golang/go/issues/14975
-			var b []byte
-			var err error
-			if r.Header.Get("content-encoding") == "gzip" {
-				reader, _ := gzip.NewReader(r.Body)
-				b, err = ioutil.ReadAll(reader)
-			} else {
-				b, err = ioutil.ReadAll(r.Body)
-			}
 
-			if err != nil {
-				server.Logger.Error("Error while reading response body", zap.Error(err))
-				return err
-			}
+		cacheHeadersEnabled := r.Header.Get(CacheHeaderEnabledKey)
+		maxAgeInSecond, err := time.ParseDuration(os.Getenv("CACHE_TTL"))
 
-			buf := server.gzipWriter(b)
-			go func(reqUrl *url.URL, data []byte, ttl int, cacheHeadersEnabled string) {
-				hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
-				cacheData := CacheData{Body: data}
-
-				if cacheHeadersEnabled == "true" {
-					headers := make(map[string]string)
-					for h, v := range r.Header {
-						headers[h] = strings.Join(v, ";")
-					}
-					cacheData.Headers = headers
-				}
-
-				cacheDataBytes, _ := json.Marshal(cacheData)
-				server.Logger.Info(strconv.FormatBool(server.Repo == nil))
-				server.Repo.SetKey(hashedURL, cacheDataBytes, ttl)
-			}(r.Request.URL, buf.Bytes(), maxAgeInSecond, cacheHeadersEnabled)
-
-			err = r.Body.Close()
-			if err != nil {
-				server.Logger.Error("Error while closing response body", zap.Error(err))
-				return err
-			}
-
-			var body io.ReadCloser
-			if r.Header.Get("content-encoding") == "gzip" {
-				body = ioutil.NopCloser(buf)
-			} else {
-				body = ioutil.NopCloser(bytes.NewReader(b))
-			}
-
-			r.Body = body
+		if err != nil {
+			server.Logger.Error("invalid cache TTL", zap.Error(err))
+			return nil
 		}
+
+		r.Header.Del("Content-Length") // https://github.com/golang/go/issues/14975
+		var b []byte
+		if r.Header.Get("content-encoding") == "gzip" {
+			reader, _ := gzip.NewReader(r.Body)
+			b, err = ioutil.ReadAll(reader)
+		} else {
+			b, err = ioutil.ReadAll(r.Body)
+		}
+
+		if err != nil {
+			server.Logger.Error("Error while reading response body", zap.Error(err))
+			return err
+		}
+
+		buf := server.gzipWriter(b)
+		go func(reqUrl *url.URL, data []byte, ttl time.Duration, cacheHeadersEnabled string) {
+			hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
+			cacheData := CacheData{Body: data}
+
+			if cacheHeadersEnabled == "true" {
+				headers := make(map[string]string)
+				for h, v := range r.Header {
+					headers[h] = strings.Join(v, ";")
+				}
+				cacheData.Headers = headers
+			}
+
+			cacheDataBytes, _ := json.Marshal(cacheData)
+			server.Repo.SetKey(hashedURL, cacheDataBytes, ttl)
+		}(r.Request.URL, buf.Bytes(), maxAgeInSecond, cacheHeadersEnabled)
+
+		err = r.Body.Close()
+		if err != nil {
+			server.Logger.Error("Error while closing response body", zap.Error(err))
+			return err
+		}
+
+		var body io.ReadCloser
+		if r.Header.Get("content-encoding") == "gzip" {
+			body = ioutil.NopCloser(buf)
+		} else {
+			body = ioutil.NopCloser(bytes.NewReader(b))
+		}
+
+		r.Body = body
 
 		return nil
 	}
@@ -171,6 +172,8 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 	hashedURL := server.HashURL(server.ReorderQueryString(r.URL))
 	cachedDataBytes := server.CheckCache(hashedURL)
 
+	server.Logger.Info("serve request", zap.String("url", r.URL.String()), zap.Bool("cached", cachedDataBytes != nil))
+
 	if cachedDataBytes != nil {
 		w.Header().Add("X-Cache-Response-For", r.URL.String())
 		w.Header().Add("Content-Type", "application/json;charset=UTF-8") //todo get from cache?
@@ -227,15 +230,6 @@ func writeHeaders(w http.ResponseWriter, headers map[string]string) {
 			w.Header().Set(h, v)
 		}
 	}
-}
-
-func (server CacheServer) GetHeaderTTL(cacheHeaderValue string) int {
-	cacheValues := strings.Split(cacheHeaderValue, "=")
-	var maxAgeInSecond = 0
-	if len(cacheValues) > 1 {
-		maxAgeInSecond, _ = strconv.Atoi(cacheValues[1])
-	}
-	return maxAgeInSecond
 }
 
 func (server CacheServer) HashURL(url string) string {

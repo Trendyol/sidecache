@@ -3,7 +3,6 @@ package cache
 import (
 	"go.uber.org/zap"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/go-redis/redis"
@@ -27,9 +26,8 @@ func NewRedisRepository(logger *zap.Logger) (*RedisRepository, error) {
 	return &RedisRepository{client: client, logger: logger}, nil
 }
 
-func (repository *RedisRepository) SetKey(key string, value []byte, ttl int) {
-	duration, _ := time.ParseDuration(strconv.FormatInt(int64(ttl), 10))
-	status := repository.client.Set(key, string(value), duration)
+func (repository *RedisRepository) SetKey(key string, value []byte, ttl time.Duration) {
+	status := repository.client.Set(key, string(value), ttl)
 	_, err := status.Result()
 	if err != nil {
 		repository.logger.Error(err.Error())
@@ -40,8 +38,11 @@ func (repository *RedisRepository) Get(key string) []byte {
 	status := repository.client.Get(key)
 	stringResult, err := status.Result()
 
-	if err != nil && err != redis.Nil {
-		repository.logger.Error(err.Error())
+	if err != nil {
+		if err != redis.Nil {
+			repository.logger.Error(err.Error())
+		}
+		return nil
 	}
 
 	return []byte(stringResult)
