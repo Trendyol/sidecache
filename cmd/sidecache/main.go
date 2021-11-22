@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/Trendyol/sidecache/pkg/cache"
-	"github.com/Trendyol/sidecache/pkg/server"
+	"github.com/zeriontech/sidecache/pkg/cache"
+	"github.com/zeriontech/sidecache/pkg/server"
 	"go.uber.org/zap"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"time"
 )
 
 var version string
@@ -16,7 +17,18 @@ func main() {
 	logger.Info("Side cache process started...", zap.String("version", version))
 
 	defer logger.Sync()
-	couchbaseRepo := cache.NewCouchbaseRepository(logger)
+	cacheRepo, err := cache.NewRedisRepository(logger)
+	if err != nil {
+		for {
+			logger.Warn("Redis is not connected, retrying...")
+			if repo, err := cache.NewRedisRepository(logger); err == nil {
+				cacheRepo = repo
+				break
+			}
+			time.Sleep(3 * time.Second)
+		}
+	}
+	logger.Info("Redis is connected.")
 
 	mainContainerPort := os.Getenv("MAIN_CONTAINER_PORT")
 	logger.Info("Main container port", zap.String("port", mainContainerPort))
@@ -31,21 +43,8 @@ func main() {
 
 	proxy := httputil.NewSingleHostReverseProxy(mainContainerURL)
 
-	cacheServer := server.NewServer(couchbaseRepo, proxy, prom, logger)
+	cacheServer := server.NewServer(cacheRepo, proxy, prom, logger)
 	logger.Info("Cache key prefix", zap.String("prefix", cacheServer.CacheKeyPrefix))
-
-	if couchbaseRepo == nil {
-		go func() {
-			for {
-				logger.Warn("Couchbase repo is nil, retrying connection...")
-				if newRepo := cache.NewCouchbaseRepository(logger); newRepo != nil {
-					cacheServer.Repo = newRepo
-					break
-				}
-			}
-			logger.Info("Couchbase repo recreated successfully.")
-		}()
-	}
 
 	stopChan := make(chan int)
 	cacheServer.Start(stopChan)

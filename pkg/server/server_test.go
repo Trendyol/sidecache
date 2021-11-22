@@ -6,10 +6,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/Trendyol/sidecache/pkg/cache"
-	"github.com/Trendyol/sidecache/pkg/server"
 	"github.com/golang/mock/gomock"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/zeriontech/sidecache/pkg/cache"
+	"github.com/zeriontech/sidecache/pkg/server"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"net"
@@ -27,7 +27,7 @@ var proxy = httputil.NewSingleHostReverseProxy(apiUrl)
 var logger, _ = zap.NewProduction()
 var client = server.NewPrometheusClient()
 var cacheServer *server.CacheServer
-var repos cache.CacheRepository
+var repos cache.Repository
 
 func TestMain(m *testing.M) {
 	client.CacheHitCounter = prometheus.NewCounter(
@@ -214,13 +214,13 @@ func TestReturnCacheHeadersWhenCacheHeaderEnabled(t *testing.T) {
 
 	userByte, _ := json.Marshal(user)
 	headers := map[string]string{
-		"Content-Type":"application/json",
-		"Cache-TTL": "300",
+		"Content-Type":              "application/json",
+		"Cache-TTL":                 "300",
 		"sidecache-headers-enabled": "true",
 	}
 
 	cacheData := server.CacheData{
-		Body: userByte,
+		Body:    userByte,
 		Headers: headers,
 	}
 

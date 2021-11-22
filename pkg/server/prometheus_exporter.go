@@ -18,14 +18,14 @@ var (
 			Namespace: "sidecache",
 			Name:      "cache_hit_counter",
 			Help:      "Cache hit count",
-	})
+		})
 
 	totalRequestCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Namespace: "sidecache",
 			Name:      "all_request_hit_counter",
 			Help:      "All request hit counter",
-	})
+		})
 
 	buildInfoGaugeVec = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -33,7 +33,6 @@ var (
 			Help: "Build info for sidecache admission webhook",
 		}, []string{"version"})
 )
-
 
 type Prometheus struct {
 	CacheHitCounter     prometheus.Counter
@@ -53,6 +52,3 @@ func BuildInfo(admission string) {
 		buildInfoGaugeVec.WithLabelValues(admission)
 	}
 }
-
-
-

@@ -17,8 +17,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Trendyol/sidecache/pkg/cache"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/zeriontech/sidecache/pkg/cache"
 	"go.uber.org/zap"
 )
 
@@ -27,7 +27,7 @@ const CacheHeaderEnabledKey = "sidecache-headers-enabled"
 const applicationDefaultPort = ":9191"
 
 type CacheServer struct {
-	Repo           cache.CacheRepository
+	Repo           cache.Repository
 	Proxy          *httputil.ReverseProxy
 	Prometheus     *Prometheus
 	Logger         *zap.Logger
@@ -35,11 +35,11 @@ type CacheServer struct {
 }
 
 type CacheData struct {
-	Body []byte
+	Body    []byte
 	Headers map[string]string
 }
 
-func NewServer(repo cache.CacheRepository, proxy *httputil.ReverseProxy, prom *Prometheus, logger *zap.Logger) *CacheServer {
+func NewServer(repo cache.Repository, proxy *httputil.ReverseProxy, prom *Prometheus, logger *zap.Logger) *CacheServer {
 	return &CacheServer{
 		Repo:           repo,
 		Proxy:          proxy,
@@ -77,7 +77,7 @@ func (server CacheServer) Start(stopChan chan int) {
 
 				if cacheHeadersEnabled == "true" {
 					headers := make(map[string]string)
-					for h,v := range r.Header{
+					for h, v := range r.Header {
 						headers[h] = strings.Join(v, ";")
 					}
 					cacheData.Headers = headers
@@ -138,11 +138,13 @@ func determinatePort() string {
 func (server CacheServer) gzipWriter(b []byte) *bytes.Buffer {
 	buf := bytes.NewBuffer([]byte{})
 	gzipWriter := gzip.NewWriter(buf)
-	_, err := gzipWriter.Write(b)
-	if err != nil {
-		server.Logger.Error("Gzip Writer Encountered With an Error", zap.Error(err))
+	if _, err := gzipWriter.Write(b); err != nil {
+		server.Logger.Error("Gzip writer encountered an error", zap.Error(err))
 	}
-	gzipWriter.Close()
+	if err := gzipWriter.Close(); err != nil {
+		server.Logger.Error("Gzip writer is not closed", zap.Error(err))
+		return nil
+	}
 	return buf
 }
 
@@ -181,23 +183,35 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 			//we write previously cached byte data
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				reader, _ := gzip.NewReader(bytes.NewReader(cachedDataBytes))
-				io.Copy(w, reader)
+				if _, err := io.Copy(w, reader); err != nil {
+					server.Logger.Error("IO error", zap.Error(err))
+					return
+				}
 			} else {
 				w.Header().Add("Content-Encoding", "gzip")
-				io.Copy(w, bytes.NewReader(cachedDataBytes))
+				if _, err := io.Copy(w, bytes.NewReader(cachedDataBytes)); err != nil {
+					server.Logger.Error("IO error", zap.Error(err))
+					return
+				}
 			}
 		} else {
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 				reader, _ := gzip.NewReader(bytes.NewReader(cachedData.Body))
 				delete(cachedData.Headers, "Content-Encoding")
 				writeHeaders(w, cachedData.Headers)
-				io.Copy(w, reader)
+				if _, err := io.Copy(w, reader); err != nil {
+					server.Logger.Error("IO error", zap.Error(err))
+					return
+				}
 			} else {
 				writeHeaders(w, cachedData.Headers)
 				if _, ok := cachedData.Headers["Content-Encoding"]; !ok {
 					w.Header().Add("Content-Encoding", "gzip")
 				}
-				io.Copy(w, bytes.NewReader(cachedData.Body))
+				if _, err := io.Copy(w, bytes.NewReader(cachedData.Body)); err != nil {
+					server.Logger.Error("IO error", zap.Error(err))
+					return
+				}
 			}
 		}
 

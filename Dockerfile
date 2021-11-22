@@ -1,34 +1,35 @@
-FROM registry.trendyol.com/platform/base/image/golang:1.13.4-alpine3.10 AS builder
+FROM golang:1.17.3@sha256:b5bfe0255e6fac7cec1abd091b5cc3a5c40e2ae4d09bafbe5e94cb705647f0fc as builder
 
-ENV GOPATH /go
-ENV CGO_ENABLED=0
-ENV GOOS=linux
-ENV GOARCH=amd64
+ENV GO111MODULE=on \
+    CGO_ENABLED=0  \
+    GOARCH="amd64" \
+    GOOS=linux
+
 ARG VERSION
 
-RUN mkdir /app
 WORKDIR /app
 
-COPY . .
+# Copy and download dependency using go mod
+COPY go.mod .
+COPY go.sum .
 RUN go mod download
+RUN go mod verify
+
+# Copy the code into the container
+COPY . .
+
+# Build the app
 RUN go build -ldflags="-X 'main.version=$VERSION'" -v cmd/sidecache/main.go
 
-FROM registry.trendyol.com/platform/base/image/alpine:3.10.1 AS alpine
+FROM gcr.io/distroless/base
 
 ENV LANG C.UTF-8
 ENV MAIN_CONTAINER_PORT ""
-ENV COUCHBASE_HOST ""
-ENV COUCHBASE_USERNAME ""
-ENV COUCHBASE_PASSWORD ""
-ENV BUCKET_NAME ""
+ENV REDIS_HOST ""
+ENV REDIS_PORT ""
 
-RUN apk --no-cache add tzdata ca-certificates
-COPY --from=builder /app/main   /app/main
-
-WORKDIR /app
-
-RUN chmod +x main
+COPY --from=builder /app/main /app/main
 
 EXPOSE 9191
 
-ENTRYPOINT ["./main","app"]
+ENTRYPOINT ["/app/main", "app"]

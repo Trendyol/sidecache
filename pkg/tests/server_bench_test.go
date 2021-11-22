@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"github.com/Trendyol/sidecache/pkg/server"
+	"github.com/zeriontech/sidecache/pkg/server"
 	"os"
 	"testing"
 )
