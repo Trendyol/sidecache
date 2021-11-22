@@ -22,6 +22,7 @@ import (
 	"go.uber.org/zap"
 )
 
+const CacheHeaderEnabledKey = "sidecache-headers-enabled"
 const applicationDefaultPort = ":9191"
 
 type CacheServer struct {
@@ -35,6 +36,7 @@ type CacheServer struct {
 type CacheData struct {
 	Body    []byte
 	Headers map[string]string
+	StatusCode int
 }
 
 func NewServer(repo cache.Repository, proxy *httputil.ReverseProxy, prom *Prometheus, logger *zap.Logger) *CacheServer {
@@ -53,6 +55,7 @@ func (server CacheServer) Start(stopChan chan int) {
 			return nil
 		}
 
+		cacheHeadersEnabled := r.Header.Get(CacheHeaderEnabledKey)
 		maxAgeInSecond, err := time.ParseDuration(os.Getenv("CACHE_TTL"))
 
 		if err != nil {
@@ -75,12 +78,21 @@ func (server CacheServer) Start(stopChan chan int) {
 		}
 
 		buf := server.gzipWriter(b)
-		go func(reqUrl *url.URL, data []byte, ttl time.Duration) {
+		go func(reqUrl *url.URL, data []byte, statusCode int, ttl time.Duration, cacheHeadersEnabled string) {
 			hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
-			cacheData := CacheData{Body: data}
+			cacheData := CacheData{Body: data, StatusCode: statusCode}
+
+			if cacheHeadersEnabled == "true" {
+				headers := make(map[string]string)
+				for h, v := range r.Header {
+					headers[h] = strings.Join(v, ";")
+				}
+				cacheData.Headers = headers
+			}
+
 			cacheDataBytes, _ := json.Marshal(cacheData)
 			server.Repo.SetKey(hashedURL, cacheDataBytes, ttl)
-		}(r.Request.URL, buf.Bytes(), maxAgeInSecond)
+		}(r.Request.URL, buf.Bytes(), r.StatusCode, maxAgeInSecond, cacheHeadersEnabled)
 
 		err = r.Body.Close()
 		if err != nil {
@@ -177,6 +189,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 			//if we can not marshall cached data to new structure
 			//we write previously cached byte data
 			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+				w.WriteHeader(cachedData.StatusCode)
 				reader, _ := gzip.NewReader(bytes.NewReader(cachedDataBytes))
 				if _, err := io.Copy(w, reader); err != nil {
 					server.Logger.Error("IO error", zap.Error(err))
@@ -184,6 +197,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				w.Header().Add("Content-Encoding", "gzip")
+				w.WriteHeader(cachedData.StatusCode)
 				if _, err := io.Copy(w, bytes.NewReader(cachedDataBytes)); err != nil {
 					server.Logger.Error("IO error", zap.Error(err))
 					return
@@ -194,6 +208,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 				reader, _ := gzip.NewReader(bytes.NewReader(cachedData.Body))
 				delete(cachedData.Headers, "Content-Encoding")
 				writeHeaders(w, cachedData.Headers)
+				w.WriteHeader(cachedData.StatusCode)
 				if _, err := io.Copy(w, reader); err != nil {
 					server.Logger.Error("IO error", zap.Error(err))
 					return
@@ -203,6 +218,7 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 				if _, ok := cachedData.Headers["Content-Encoding"]; !ok {
 					w.Header().Add("Content-Encoding", "gzip")
 				}
+				w.WriteHeader(cachedData.StatusCode)
 				if _, err := io.Copy(w, bytes.NewReader(cachedData.Body)); err != nil {
 					server.Logger.Error("IO error", zap.Error(err))
 					return
