@@ -39,7 +39,8 @@ func (repository *RedisRepository) SetKey(key string, value []byte, ttl int) {
 func (repository *RedisRepository) Get(key string) []byte {
 	status := repository.client.Get(key)
 	stringResult, err := status.Result()
-	if err != nil {
+
+	if err != nil && err != redis.Nil {
 		repository.logger.Error(err.Error())
 	}
 
