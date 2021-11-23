@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -34,8 +33,8 @@ type CacheServer struct {
 }
 
 type CacheData struct {
-	Body    []byte
-	Headers map[string]string
+	Body       []byte
+	Headers    map[string]string
 	StatusCode int
 }
 
@@ -64,20 +63,13 @@ func (server CacheServer) Start(stopChan chan int) {
 		}
 
 		r.Header.Del("Content-Length") // https://github.com/golang/go/issues/14975
-		var b []byte
-		if r.Header.Get("content-encoding") == "gzip" {
-			reader, _ := gzip.NewReader(r.Body)
-			b, err = ioutil.ReadAll(reader)
-		} else {
-			b, err = ioutil.ReadAll(r.Body)
-		}
+		b, err := ioutil.ReadAll(r.Body)
 
 		if err != nil {
 			server.Logger.Error("Error while reading response body", zap.Error(err))
 			return err
 		}
 
-		buf := server.gzipWriter(b)
 		go func(reqUrl *url.URL, data []byte, statusCode int, ttl time.Duration, cacheHeadersEnabled string) {
 			hashedURL := server.HashURL(server.ReorderQueryString(reqUrl))
 			cacheData := CacheData{Body: data, StatusCode: statusCode}
@@ -92,7 +84,7 @@ func (server CacheServer) Start(stopChan chan int) {
 
 			cacheDataBytes, _ := json.Marshal(cacheData)
 			server.Repo.SetKey(hashedURL, cacheDataBytes, ttl)
-		}(r.Request.URL, buf.Bytes(), r.StatusCode, maxAgeInSecond, cacheHeadersEnabled)
+		}(r.Request.URL, b, r.StatusCode, maxAgeInSecond, cacheHeadersEnabled)
 
 		err = r.Body.Close()
 		if err != nil {
@@ -100,14 +92,7 @@ func (server CacheServer) Start(stopChan chan int) {
 			return err
 		}
 
-		var body io.ReadCloser
-		if r.Header.Get("content-encoding") == "gzip" {
-			body = ioutil.NopCloser(buf)
-		} else {
-			body = ioutil.NopCloser(bytes.NewReader(b))
-		}
-
-		r.Body = body
+		r.Body = ioutil.NopCloser(bytes.NewReader(b))
 
 		return nil
 	}
@@ -138,19 +123,6 @@ func determinatePort() string {
 
 	}
 	return ":" + customPort
-}
-
-func (server CacheServer) gzipWriter(b []byte) *bytes.Buffer {
-	buf := bytes.NewBuffer([]byte{})
-	gzipWriter := gzip.NewWriter(buf)
-	if _, err := gzipWriter.Write(b); err != nil {
-		server.Logger.Error("Gzip writer encountered an error", zap.Error(err))
-	}
-	if err := gzipWriter.Close(); err != nil {
-		server.Logger.Error("Gzip writer is not closed", zap.Error(err))
-		return nil
-	}
-	return buf
 }
 
 func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
@@ -185,45 +157,16 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		var cachedData CacheData
 		err := json.Unmarshal(cachedDataBytes, &cachedData)
 		if err != nil {
-			//backward compatibility
-			//if we can not marshall cached data to new structure
-			//we write previously cached byte data
-			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-				w.WriteHeader(cachedData.StatusCode)
-				reader, _ := gzip.NewReader(bytes.NewReader(cachedDataBytes))
-				if _, err := io.Copy(w, reader); err != nil {
-					server.Logger.Error("IO error", zap.Error(err))
-					return
-				}
-			} else {
-				w.Header().Add("Content-Encoding", "gzip")
-				w.WriteHeader(cachedData.StatusCode)
-				if _, err := io.Copy(w, bytes.NewReader(cachedDataBytes)); err != nil {
-					server.Logger.Error("IO error", zap.Error(err))
-					return
-				}
-			}
-		} else {
-			if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-				reader, _ := gzip.NewReader(bytes.NewReader(cachedData.Body))
-				delete(cachedData.Headers, "Content-Encoding")
-				writeHeaders(w, cachedData.Headers)
-				w.WriteHeader(cachedData.StatusCode)
-				if _, err := io.Copy(w, reader); err != nil {
-					server.Logger.Error("IO error", zap.Error(err))
-					return
-				}
-			} else {
-				writeHeaders(w, cachedData.Headers)
-				if _, ok := cachedData.Headers["Content-Encoding"]; !ok {
-					w.Header().Add("Content-Encoding", "gzip")
-				}
-				w.WriteHeader(cachedData.StatusCode)
-				if _, err := io.Copy(w, bytes.NewReader(cachedData.Body)); err != nil {
-					server.Logger.Error("IO error", zap.Error(err))
-					return
-				}
-			}
+			server.Logger.Error("Can not unmarshal cached data", zap.Error(err))
+			return
+		}
+
+		writeHeaders(w, cachedData.Headers)
+		w.WriteHeader(cachedData.StatusCode)
+
+		if _, err := io.Copy(w, bytes.NewReader(cachedData.Body)); err != nil {
+			server.Logger.Error("IO error", zap.Error(err))
+			return
 		}
 
 		server.Prometheus.CacheHitCounter.Inc()
