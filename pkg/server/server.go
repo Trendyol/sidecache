@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amyangfei/redlock-go/v2/redlock"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zeriontech/sidecache/pkg/cache"
 	"go.uber.org/zap"
@@ -26,6 +28,7 @@ const applicationDefaultPort = ":9191"
 
 type CacheServer struct {
 	Repo           cache.Repository
+	LockMgr        *redlock.RedLock
 	Proxy          *httputil.ReverseProxy
 	Prometheus     *Prometheus
 	Logger         *zap.Logger
@@ -38,9 +41,10 @@ type CacheData struct {
 	StatusCode int
 }
 
-func NewServer(repo cache.Repository, proxy *httputil.ReverseProxy, prom *Prometheus, logger *zap.Logger) *CacheServer {
+func NewServer(repo cache.Repository, lockMgr *redlock.RedLock, proxy *httputil.ReverseProxy, prom *Prometheus, logger *zap.Logger) *CacheServer {
 	return &CacheServer{
 		Repo:           repo,
+		LockMgr:        lockMgr,
 		Proxy:          proxy,
 		Prometheus:     prom,
 		Logger:         logger,
@@ -126,6 +130,7 @@ func determinatePort() string {
 }
 
 func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := context.TODO()
 	server.Prometheus.TotalRequestCounter.Inc()
 
 	defer func() {
@@ -145,34 +150,81 @@ func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	key := server.HashURL(server.ReorderQueryString(r.URL)) + "-lock"
+	lockTTL := 15 * time.Second  // todo: configure TTL
+	_, err := server.LockMgr.Lock(ctx, key, lockTTL)
+	if err != nil {
+		// some other goroutine is already working on the same request
+		acquired := make(chan string, 1)
+
+		go func(done chan string) {
+			for i := 0; i < 7; i++ {
+				// back-offs: 10ms - 50ms - 100ms - 500ms - 1s - 5s - 10s
+				multiplier := 1
+				if i % 2 != 0 {
+					multiplier = 5
+				}
+				backoff := time.Duration(multiplier * int(math.Pow(10, float64(i / 2 + 1)))) * time.Millisecond
+				server.Logger.Info("wait lock", zap.Duration("backoff", backoff), zap.String("url", r.URL.String()))
+				time.Sleep(backoff)
+
+				if _, err := server.LockMgr.Lock(ctx, key, lockTTL); err == nil {
+					// lock is acquired
+					acquired <- "success"
+					return
+				}
+			}
+			acquired <- "fail"
+		}(acquired)
+
+		// wait for the lock
+		if result := <-acquired; result != "success" {
+			server.Logger.Error("failed to acquire the lock")
+		}
+	}
+
+	// lock is acquired
+	serve(server, w, r)
+
+	// unlock the lock
+	if err := server.LockMgr.UnLock(ctx, key); err != nil {
+		server.Logger.Error("Could not unlock the lock", zap.Error(err))
+	}
+}
+
+func serve(server CacheServer, w http.ResponseWriter, r *http.Request) {
 	hashedURL := server.HashURL(server.ReorderQueryString(r.URL))
 	cachedDataBytes := server.CheckCache(hashedURL)
 
 	server.Logger.Info("serve request", zap.String("url", r.URL.String()), zap.Bool("cached", cachedDataBytes != nil))
 
 	if cachedDataBytes != nil {
-		w.Header().Add("X-Cache-Response-For", r.URL.String())
-		w.Header().Add("Content-Type", "application/json;charset=UTF-8") //todo get from cache?
-
-		var cachedData CacheData
-		err := json.Unmarshal(cachedDataBytes, &cachedData)
-		if err != nil {
-			server.Logger.Error("Can not unmarshal cached data", zap.Error(err))
-			return
-		}
-
-		writeHeaders(w, cachedData.Headers)
-		w.WriteHeader(cachedData.StatusCode)
-
-		if _, err := io.Copy(w, bytes.NewReader(cachedData.Body)); err != nil {
-			server.Logger.Error("IO error", zap.Error(err))
-			return
-		}
-
-		server.Prometheus.CacheHitCounter.Inc()
+		serveFromCache(cachedDataBytes, server, w, r)
 	} else {
 		server.Proxy.ServeHTTP(w, r)
 	}
+}
+
+func serveFromCache(cachedDataBytes []byte, server CacheServer, w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("X-Cache-Response-For", r.URL.String())
+	w.Header().Add("Content-Type", "application/json;charset=UTF-8")  // todo get from cache?
+
+	var cachedData CacheData
+	err := json.Unmarshal(cachedDataBytes, &cachedData)
+	if err != nil {
+		server.Logger.Error("Can not unmarshal cached data", zap.Error(err))
+		return
+	}
+
+	writeHeaders(w, cachedData.Headers)
+	w.WriteHeader(cachedData.StatusCode)
+
+	if _, err := io.Copy(w, bytes.NewReader(cachedData.Body)); err != nil {
+		server.Logger.Error("IO error", zap.Error(err))
+		return
+	}
+
+	server.Prometheus.CacheHitCounter.Inc()
 }
 
 func writeHeaders(w http.ResponseWriter, headers map[string]string) {
