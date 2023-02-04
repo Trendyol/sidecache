@@ -35,7 +35,7 @@ type CacheServer struct {
 }
 
 type CacheData struct {
-	Body []byte
+	Body    []byte
 	Headers map[string]string
 }
 
@@ -77,7 +77,7 @@ func (server CacheServer) Start(stopChan chan int) {
 
 				if cacheHeadersEnabled == "true" {
 					headers := make(map[string]string)
-					for h,v := range r.Header{
+					for h, v := range r.Header {
 						headers[h] = strings.Join(v, ";")
 					}
 					cacheData.Headers = headers
@@ -136,14 +136,14 @@ func determinatePort() string {
 }
 
 func (server CacheServer) gzipWriter(b []byte) *bytes.Buffer {
-	buf := bytes.NewBuffer([]byte{})
-	gzipWriter := gzip.NewWriter(buf)
+	var buf bytes.Buffer
+	gzipWriter := gzip.NewWriter(&buf)
 	_, err := gzipWriter.Write(b)
 	if err != nil {
 		server.Logger.Error("Gzip Writer Encountered With an Error", zap.Error(err))
 	}
 	gzipWriter.Close()
-	return buf
+	return &buf
 }
 
 func (server CacheServer) CacheHandler(w http.ResponseWriter, r *http.Request) {
