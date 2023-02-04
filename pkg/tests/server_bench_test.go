@@ -8,7 +8,10 @@ import (
 
 func BenchmarkServerHash(b *testing.B) {
 	os.Setenv("CACHE_KEY_PREFIX", "test")
-	var cacheServer *server.CacheServer = new(server.CacheServer)
+	var cacheServer = new(server.CacheServer)
+
+	b.ResetTimer()
+	
 	for n := 0; n < b.N; n++ {
 		cacheServer.HashURL("adsfadsdfasdfas")
 	}
