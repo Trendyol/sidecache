@@ -1,3 +1,5 @@
+
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Trendyol/sidecache/badge)](https://scorecard.dev/viewer/?uri=github.com/Trendyol/sidecache)
 # sidecache
 Sidecar cache for kubernetes applications. It acts as a proxy sidecar between application and client, routes incoming requests to cache storage or application according to Istio VirtualService routing rules.
 
